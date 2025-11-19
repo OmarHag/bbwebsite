@@ -1,53 +1,72 @@
-// src/app/layout.tsx
 import "./globals.css";
 import Image from "next/image";
 import Link from "next/link";
 
 export const metadata = {
   title: "Avanti InterviewCoach AI",
-  description: "Interactive AI mock interview system with voice AI interviewer",
+  description: "AI-powered interview coach with realistic voice practice",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
-      <body className="bg-[#0A0F1F] text-white">
-        {/* HEADER */}
-        <header className="w-full border-b border-white/10 bg-[#0D1224]">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-
-            {/* LOGO */}
-            <Link href="/" className="flex items-center gap-3">
-              <Image
-                src="/logo.png"
-                alt="Avanti Logo"
-                width={120}
-                height={120}
-                className="object-contain"
-                priority
-              />
-              <span className="text-2xl font-semibold text-blue-400">
+      <body className="bg-slate-900 text-white">
+        {/* TOP NAVBAR */}
+        <header className="fixed top-0 left-0 right-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-white/10">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6">
+            {/* LOGO + BRAND */}
+            <Link href="/" className="flex items-center gap-3 cursor-pointer">
+              <div className="relative h-10 w-28 md:h-12 md:w-32">
+                <Image
+                  src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/691ce79519a4c03a38244c47/bc8be9f3d_Screenshot2025-11-18141322.png"
+                  alt="Avanti Logo"
+                  fill
+                  className="object-contain"
+                />
+              </div>
+              <span className="hidden text-xl font-bold text-white md:inline">
                 Avanti InterviewCoach AI
               </span>
             </Link>
 
-            {/* NAVIGATION */}
-            <nav className="flex items-center gap-6 text-sm">
-              <Link href="/practice" className="hover:text-blue-400">
+            {/* NAV LINKS */}
+            <nav className="flex items-center gap-4 md:gap-6 text-sm font-medium">
+              <Link
+                href="/practice"
+                className="text-slate-200 hover:text-teal-400 transition-colors"
+              >
                 Practice
               </Link>
-              <Link href="/voice" className="hover:text-blue-400">
+              <Link
+                href="/voice"
+                className="text-slate-200 hover:text-teal-400 transition-colors"
+              >
                 Voice Interview
               </Link>
-              <Link href="/pricing" className="hover:text-blue-400">
+              <Link
+                href="/pricing"
+                className="text-slate-200 hover:text-teal-400 transition-colors"
+              >
                 Pricing
+              </Link>
+
+              {/* SIGN UP BUTTON */}
+              <Link
+                href="/signup"
+                className="ml-2 rounded-full bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 transition-colors"
+              >
+                Sign Up Free
               </Link>
             </nav>
           </div>
         </header>
 
-        {/* PAGE CONTENT */}
-        <div>{children}</div>
+        {/* PAGE CONTENT - add top padding to clear fixed header */}
+        <div className="pt-20">{children}</div>
       </body>
     </html>
   );
