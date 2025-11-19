@@ -24,35 +24,43 @@ const COMPANIES = [
 
 export default function CompanyTicker() {
   return (
-    <div className="relative overflow-hidden bg-white/5 backdrop-blur-sm border-y border-white/10 py-6 mt-4 rounded-2xl">
-      <motion.div
-        animate={{ x: [0, -2000] }}
-        transition={{
-          x: {
-            repeat: Infinity,
-            repeatType: "loop",
-            duration: 40,
-            ease: "linear",
-          },
-        }}
-        className="flex gap-6 md:gap-12 items-center whitespace-nowrap"
-      >
-        {[...COMPANIES, ...COMPANIES, ...COMPANIES].map((company, idx) => (
-          <div
-            key={idx}
-            className="inline-flex items-center gap-3 px-4 py-2 bg-white/10 rounded-lg backdrop-blur-sm border border-white/10"
-          >
-            <img
-              src={company.logo}
-              alt={company.name}
-              className="w-6 h-6 object-contain"
-            />
-            <span className="text-sm font-medium text-white/90">
-              {company.name}
-            </span>
-          </div>
-        ))}
-      </motion.div>
+    <div className="w-full mt-10">
+      {/* 🔥 NEW LABEL */}
+      <p className="text-center text-slate-300 text-sm md:text-base mb-4">
+        Train for Real Interviews — From Startups to Fortune 500
+      </p>
+
+      {/* COMPANY TICKER */}
+      <div className="relative overflow-hidden bg-white/5 backdrop-blur-sm border-y border-white/10 py-6 rounded-2xl">
+        <motion.div
+          animate={{ x: [0, -2000] }}
+          transition={{
+            x: {
+              repeat: Infinity,
+              repeatType: "loop",
+              duration: 40,
+              ease: "linear",
+            },
+          }}
+          className="flex gap-6 md:gap-12 items-center whitespace-nowrap"
+        >
+          {[...COMPANIES, ...COMPANIES, ...COMPANIES].map((company, idx) => (
+            <div
+              key={idx}
+              className="inline-flex items-center gap-3 px-4 py-2 bg-white/10 rounded-lg backdrop-blur-sm border border-white/10"
+            >
+              <img
+                src={company.logo}
+                alt={company.name}
+                className="w-6 h-6 object-contain"
+              />
+              <span className="text-sm font-medium text-white/90">
+                {company.name}
+              </span>
+            </div>
+          ))}
+        </motion.div>
+      </div>
     </div>
   );
 }
