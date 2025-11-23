@@ -5,42 +5,67 @@ import { useEffect, useState, useRef } from "react";
 export default function VoiceInterviewPage() {
   const [messages, setMessages] = useState<{ from: string; text: string }[]>([]);
   const [recording, setRecording] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState("");
+  const [selectedRole, setSelectedRole] = useState("");
+
   const [aiThinking, setAiThinking] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null); // ✅ FIXED — NOW INSIDE COMPONENT
 
   // ------------------------------------------
-  // STOP SPEAKING ANYTIME PAGE UNMOUNTS
+  // STOP SPEAKING WHEN PAGE UNMOUNTS
   // ------------------------------------------
   useEffect(() => {
     return () => {
-      speechSynthesis.cancel(); // 🚫 stop AI voice when leaving page
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
     };
   }, []);
 
   // ------------------------------------------
-  // STOP SPEAKING MANUALLY
+  // STOP AI VOICE MANUALLY
   // ------------------------------------------
   const stopVoice = () => {
-    speechSynthesis.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
   };
 
   // ------------------------------------------
-  // AI SPEAK FUNCTION
+  // ELEVENLABS TTS
   // ------------------------------------------
-  const speak = (text: string) => {
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.rate = 1;
-    utter.pitch = 1;
-    speechSynthesis.speak(utter);
+  const speak = async (text: string) => {
+    // stop previous audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+
+    const res = await fetch("/api/tts", {
+      method: "POST",
+      body: JSON.stringify({ text }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const audioBlob = await res.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+
+    audio.play();
   };
 
   // ------------------------------------------
   // START RECORDING
   // ------------------------------------------
   const startRecording = async () => {
-    speechSynthesis.cancel(); // stop any current speech
+    stopVoice(); // stop AI voice before recording
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const mediaRecorder = new MediaRecorder(stream);
@@ -49,13 +74,17 @@ export default function VoiceInterviewPage() {
     audioChunksRef.current = [];
     setRecording(true);
 
-    mediaRecorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
+    mediaRecorder.ondataavailable = (e) =>
+      audioChunksRef.current.push(e.data);
 
     mediaRecorder.onstop = async () => {
       setRecording(false);
       setAiThinking(true);
 
-      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      const audioBlob = new Blob(audioChunksRef.current, {
+        type: "audio/webm",
+      });
+
       await sendAudio(audioBlob);
 
       setAiThinking(false);
@@ -68,7 +97,7 @@ export default function VoiceInterviewPage() {
   // STOP RECORDING
   // ------------------------------------------
   const stopRecording = () => {
-    speechSynthesis.cancel(); // stop AI speech here too
+    stopVoice();
     mediaRecorderRef.current?.stop();
   };
 
@@ -92,7 +121,7 @@ export default function VoiceInterviewPage() {
       { from: "AI", text: data.reply },
     ]);
 
-    speak(data.reply);
+    await speak(data.reply);
   };
 
   return (
@@ -107,32 +136,110 @@ export default function VoiceInterviewPage() {
           the AI listens, analyzes, and responds instantly.
         </p>
 
+
+        {/* COMPANY + ROLE SELECTOR */}
+        <div className="mb-8 space-y-4">
+
+          {/* Company */}
+          <div>
+            <label className="block mb-1 text-sm text-gray-300">Select Company</label>
+            <select
+              value={selectedCompany}
+              onChange={(e) => setSelectedCompany(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded-lg"
+            >
+              <option value="">Choose a company</option>
+              <option value="Google">Google</option>
+              <option value="Amazon">Amazon</option>
+              <option value="Meta">Meta</option>
+              <option value="Apple">Apple</option>
+              <option value="Microsoft">Microsoft</option>
+              <option value="NVIDIA">NVIDIA</option>
+              <option value="Tesla">Tesla</option>
+              <option value="Stripe">Stripe</option>
+              <option value="Uber">Uber</option>
+              <option value="Bloomberg">Bloomberg</option>
+            </select>
+          </div>
+
+          {/* Role */}
+          <div>
+            <label className="block mb-1 text-sm text-gray-300">Select Role</label>
+            <select
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded-lg"
+            >
+              <option value="">Choose a role</option>
+
+              {/* Engineering */}
+              <option value="Software Engineer">Software Engineer</option>
+              <option value="Frontend Engineer">Frontend Engineer</option>
+              <option value="Backend Engineer">Backend Engineer</option>
+              <option value="Full-Stack Engineer">Full-Stack Engineer</option>
+              <option value="Mobile Engineer">Mobile Engineer (iOS/Android)</option>
+              <option value="Machine Learning Engineer">Machine Learning Engineer</option>
+              <option value="Data Engineer">Data Engineer</option>
+              <option value="Cloud Engineer">Cloud Engineer</option>
+              <option value="Cybersecurity Engineer">Cybersecurity Engineer</option>
+              <option value="DevOps Engineer">DevOps / Infrastructure Engineer</option>
+              <option value="SRE">Site Reliability Engineer (SRE)</option>
+
+              {/* Data */}
+              <option value="Data Analyst">Data Analyst</option>
+              <option value="Business Intelligence Analyst">Business Intelligence Analyst</option>
+              <option value="Product Data Analyst">Product Data Analyst</option>
+
+              {/* Product & Design */}
+              <option value="Product Manager">Product Manager</option>
+              <option value="Program Manager">Program Manager</option>
+              <option value="UI/UX Designer">UI/UX Designer</option>
+              <option value="UX Researcher">UX Researcher</option>
+
+              {/* Hardware Roles (Tesla, Apple, NVIDIA) */}
+              <option value="Electrical Engineer">Electrical Engineer</option>
+              <option value="Mechanical Engineer">Mechanical Engineer</option>
+              <option value="Hardware Engineer">Hardware Engineer</option>
+              <option value="Autopilot Engineer">Autopilot / Robotics Engineer</option>
+
+              {/* Business / Ops */}
+              <option value="Business Analyst">Business Analyst</option>
+              <option value="Operations Analyst">Operations Analyst</option>
+              <option value="Project Manager">Project Manager</option>
+              <option value="Sales Engineer">Sales Engineer</option>
+              <option value="Technical Program Manager">Technical Program Manager</option>
+            </select>
+          </div>
+        </div>
+
         {/* BUTTONS */}
         <div className="flex items-center justify-center gap-6 mb-10">
 
-          {/* START BUTTON */}
+          {/* START */}
           <button
             onClick={startRecording}
             disabled={recording}
-            className={`px-6 py-3 rounded-lg font-semibold text-white transition ${
-              recording ? "bg-gray-700 cursor-not-allowed" : "bg-green-600 hover:bg-green-500"
-            }`}
+            className={`px-6 py-3 rounded-lg font-semibold text-white transition ${recording
+              ? "bg-gray-700 cursor-not-allowed"
+              : "bg-green-600 hover:bg-green-500"
+              }`}
           >
             {recording ? "Listening..." : "Start Talking"}
           </button>
 
-          {/* STOP & SEND BUTTON */}
+          {/* STOP & SEND */}
           <button
             onClick={stopRecording}
             disabled={!recording}
-            className={`px-6 py-3 rounded-lg font-semibold text-white transition ${
-              recording ? "bg-red-600 hover:bg-red-500" : "bg-gray-700 cursor-not-allowed"
-            }`}
+            className={`px-6 py-3 rounded-lg font-semibold text-white transition ${recording
+              ? "bg-red-600 hover:bg-red-500"
+              : "bg-gray-700 cursor-not-allowed"
+              }`}
           >
             Stop & Send
           </button>
 
-          {/* STOP VOICE BUTTON — NEW */}
+          {/* STOP VOICE */}
           <button
             onClick={stopVoice}
             className="px-6 py-3 rounded-lg font-semibold bg-red-700 hover:bg-red-600 text-white shadow-md"
@@ -140,27 +247,27 @@ export default function VoiceInterviewPage() {
             Stop Voice
           </button>
 
-          {/* RED DOT */}
+          {/* RECORDING DOT */}
           {recording && (
             <div className="w-4 h-4 rounded-full bg-red-500 animate-pulse"></div>
           )}
         </div>
 
-        {/* CHAT MESSAGES */}
+        {/* MESSAGES */}
         <div className="space-y-4">
           {messages.map((m, i) => (
             <div
               key={i}
-              className={`p-4 rounded-xl max-w-[80%] ${
-                m.from === "You" ? "bg-blue-600 ml-auto" : "bg-gray-800 text-gray-200"
-              }`}
+              className={`p-4 rounded-xl max-w-[80%] ${m.from === "You"
+                ? "bg-blue-600 ml-auto"
+                : "bg-gray-800 text-gray-200"
+                }`}
             >
               <p className="text-sm opacity-60 mb-1">{m.from}</p>
               <p>{m.text}</p>
             </div>
           ))}
 
-          {/* AI thinking */}
           {aiThinking && (
             <div className="bg-gray-800 p-4 rounded-xl w-24 flex gap-2">
               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
