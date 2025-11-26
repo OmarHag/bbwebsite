@@ -9,22 +9,21 @@ export async function POST(req: Request) {
 
     const audioFile = formData.get("audio") as File | null;
     const company = (formData.get("company") as string) || "General company";
-    const role =
-      (formData.get("role") as string) || "Software Engineering Intern";
+    const role = (formData.get("role") as string) || "Software Engineering Intern";
+    const resumeText = (formData.get("resumeText") as string) || "";
 
     if (!audioFile) {
-      return NextResponse.json(
-        { error: "No audio uploaded" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "No audio uploaded" }, { status: 400 });
     }
 
-    // Wrap Blob into a proper File for Groq Whisper
+    // Wrap into proper file for Whisper
     const wrapped = new File([audioFile], "audio.webm", {
       type: "audio/webm",
     });
 
-    // Transcribe user speech
+    // ----------------------------
+    // 1) TRANSCRIBE AUDIO
+    // ----------------------------
     const transcription = await groq.audio.transcriptions.create({
       file: wrapped,
       model: "whisper-large-v3",
@@ -32,45 +31,78 @@ export async function POST(req: Request) {
 
     const transcriptText = (transcription.text || "").trim();
 
-    // -------- SYSTEM PROMPT: STRICT INTERVIEW MODE --------
-    const systemPrompt = `
-You are an AI mock interviewer for "${company}", interviewing the user for the role of "${role}".
+    // ----------------------------
+    // 2) EXTRACT PROJECTS FROM RESUME
+    // (simple regex-based detection)
+    // ----------------------------
+    function extractProjects(text: string): string[] {
+      if (!text) return [];
+      const lines = text.split("\n");
+      return lines
+        .filter((l) => l.toLowerCase().includes("project"))
+        .slice(0, 5); // limit to 5 to keep prompt small
+    }
 
-Your rules:
-- You are ALWAYS in INTERVIEW MODE.
-- NEVER ask: "What do you want to talk about?" or any open-ended small-talk.
-- Assume the user is here ONLY to practice an interview.
-- Start the interview immediately with an interview-style question.
+    const detectedProjects = extractProjects(resumeText);
+    const projectList =
+      detectedProjects.length > 0
+        ? detectedProjects.join("\n- ")
+        : "[No clear projects detected]";
+
+    // ----------------------------
+    // 3) SYSTEM PROMPT
+    // ----------------------------
+    const systemPrompt = `
+You are a strict AI mock interviewer for the company "${company}", for the role "${role}".
+
+The candidate uploaded this resume text:
+${resumeText || "[No resume provided]"}
+
+These are project lines detected in their resume:
+- ${projectList}
+
+INTERVIEW RULES:
+- ALWAYS remain in interview mode.
+- If the user asks:
+  "Do you see my resume?"
+  "Mention a project from my resume"
+  "Talk about my resume"
+  → You MUST reference one of the detected projects above.
+- If resume is empty, say: 
+  "I received your resume but the project section was unclear."
 - Every reply MUST:
-  1) Optionally give *short* feedback on the last answer (2–3 sentences max), and
-  2) Ask EXACTLY ONE clear interview question.
-- Use realistic behavioral and/or role-specific questions for ${role} at ${company}.
-- Stay on topic: their experience, skills, projects, resume, behavioral questions, technical questions.
-- Do NOT ramble. Keep responses concise, like a real human interviewer.
-- Do NOT become a general chatbot. No life advice, no random topics, no jokes unless directly relevant.
+  1. Give short feedback (2 sentences max)
+  2. Ask EXACTLY ONE interview question
+- Prefer questions related to:
+  • Their resume  
+  • Their projects  
+  • The chosen company (${company})  
+  • The chosen role (${role})
+- DO NOT hallucinate fake projects. Use only detected ones above.
+- Keep your tone human, concise, and realistic.
 `;
 
-    // -------- USER CONTENT: INCLUDE COMPANY + ROLE CONTEXT --------
-    const userContent =
-      transcriptText.length > 0
-        ? `Company: ${company}
-Role: ${role}
-Candidate just said: "${transcriptText}".
+    // ----------------------------
+    // 4) USER PROMPT
+    // ----------------------------
+    const userPrompt = transcriptText
+      ? `User said: "${transcriptText}". Continue interview.`
+      : `Start interview for ${role} at ${company}.`;
 
-Continue the interview. Stay in interview mode.`
-        : `Start a mock interview for ${role} at ${company}. Ask the first question now.`;
-
+    // ----------------------------
+    // 5) GET AI RESPONSE
+    // ----------------------------
     const chatResponse = await groq.chat.completions.create({
       model: "llama-3.1-8b-instant",
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: userContent },
+        { role: "user", content: userPrompt },
       ],
     });
 
     const reply =
       chatResponse.choices[0]?.message?.content?.trim() ||
-      "Great, let's begin. Why are you interested in this role at " + company + "?";
+      `Let's begin. Why are you interested in this role at ${company}?`;
 
     return NextResponse.json({
       transcript: transcriptText,

@@ -3,16 +3,47 @@
 import { useEffect, useState, useRef } from "react";
 
 export default function VoiceInterviewPage() {
+  // ------------------------------
+  // STATE (must be INSIDE component)
+  // ------------------------------
   const [messages, setMessages] = useState<{ from: string; text: string }[]>([]);
   const [recording, setRecording] = useState(false);
+  const [aiThinking, setAiThinking] = useState(false);
+
   const [selectedCompany, setSelectedCompany] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
 
-  const [aiThinking, setAiThinking] = useState(false);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [resumeText, setResumeText] = useState<string>("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const audioRef = useRef<HTMLAudioElement | null>(null); // ✅ FIXED — NOW INSIDE COMPONENT
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // ------------------------------
+  // UPLOAD RESUME FUNCTION
+  // ------------------------------
+  const uploadResume = async () => {
+    if (!resumeFile) return;
+
+    const formData = new FormData();
+    formData.append("resume", resumeFile); // Key "resume" matches backend
+
+    const res = await fetch("/api/resume", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.error("Resume upload failed:", data.error);
+      return;
+    }
+
+    // Save the raw text for the interview API
+    setResumeText(data.text);
+  };
 
   // ------------------------------------------
   // STOP SPEAKING WHEN PAGE UNMOUNTS
@@ -27,7 +58,7 @@ export default function VoiceInterviewPage() {
   }, []);
 
   // ------------------------------------------
-  // STOP AI VOICE MANUALLY
+  // STOP AI VOICE
   // ------------------------------------------
   const stopVoice = () => {
     if (audioRef.current) {
@@ -40,7 +71,6 @@ export default function VoiceInterviewPage() {
   // ELEVENLABS TTS
   // ------------------------------------------
   const speak = async (text: string) => {
-    // stop previous audio
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
@@ -52,12 +82,12 @@ export default function VoiceInterviewPage() {
       headers: { "Content-Type": "application/json" },
     });
 
+    // NOTE: The TTS server response is audio/mpeg, handled by browser's Audio constructor
     const audioBlob = await res.blob();
     const audioUrl = URL.createObjectURL(audioBlob);
 
     const audio = new Audio(audioUrl);
     audioRef.current = audio;
-
     audio.play();
   };
 
@@ -65,7 +95,7 @@ export default function VoiceInterviewPage() {
   // START RECORDING
   // ------------------------------------------
   const startRecording = async () => {
-    stopVoice(); // stop AI voice before recording
+    stopVoice();
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const mediaRecorder = new MediaRecorder(stream);
@@ -74,17 +104,13 @@ export default function VoiceInterviewPage() {
     audioChunksRef.current = [];
     setRecording(true);
 
-    mediaRecorder.ondataavailable = (e) =>
-      audioChunksRef.current.push(e.data);
+    mediaRecorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
 
     mediaRecorder.onstop = async () => {
       setRecording(false);
       setAiThinking(true);
 
-      const audioBlob = new Blob(audioChunksRef.current, {
-        type: "audio/webm",
-      });
-
+      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
       await sendAudio(audioBlob);
 
       setAiThinking(false);
@@ -107,6 +133,9 @@ export default function VoiceInterviewPage() {
   const sendAudio = async (audioBlob: Blob) => {
     const formData = new FormData();
     formData.append("audio", audioBlob);
+    formData.append("company", selectedCompany || "");
+    formData.append("role", selectedRole || "");
+    formData.append("resumeText", resumeText || ""); // Sent if resume was uploaded
 
     const res = await fetch("/api/voice", {
       method: "POST",
@@ -214,6 +243,31 @@ export default function VoiceInterviewPage() {
 
         {/* BUTTONS */}
         <div className="flex items-center justify-center gap-6 mb-10">
+
+          {/* RESUME UPLOAD */}
+          <div className="mb-6">
+            <label className="block mb-1 text-sm text-gray-300">Upload Resume (PDF)</label>
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
+              className="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded-lg"
+            />
+
+            <button
+              onClick={uploadResume}
+              disabled={!resumeFile}
+              className="mt-3 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-lg disabled:bg-gray-700 disabled:cursor-not-allowed"
+            >
+              Upload Resume
+            </button>
+
+            {resumeText && (
+              <p className="text-green-400 text-sm mt-2">
+                ✔ Resume uploaded and analyzed
+              </p>
+            )}
+          </div>
 
           {/* START */}
           <button

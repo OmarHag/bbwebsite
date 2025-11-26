@@ -5,10 +5,15 @@ export async function POST(req: Request) {
     const { text } = await req.json();
 
     const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-    const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM"; // default voice
+    const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM"; 
 
     if (!ELEVENLABS_API_KEY) {
+      console.error("Missing ELEVENLABS_API_KEY in environment.");
       return new NextResponse("Missing ELEVENLABS_API_KEY", { status: 500 });
+    }
+    
+    if (!text) {
+         return new NextResponse("Missing text input for TTS.", { status: 400 });
     }
 
     const url = `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`;
@@ -21,6 +26,7 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         text,
+        model_id: "eleven_multilingual_v2", 
         voice_settings: {
           stability: 0.3,
           similarity_boost: 0.8,
@@ -29,18 +35,21 @@ export async function POST(req: Request) {
     });
 
     if (!response.ok) {
-      return new NextResponse("TTS API Error", { status: 500 });
+      const errorText = await response.text();
+      console.error(`ElevenLabs API failed with status ${response.status}: ${errorText}`);
+      return new NextResponse(`TTS API Error: ${errorText}`, { status: 500 });
     }
 
     const audioArrayBuffer = await response.arrayBuffer();
 
     return new NextResponse(audioArrayBuffer, {
       headers: {
-        "Content-Type": "audio/mpeg",
+        "Content-Type": "audio/mpeg", 
+        "Cache-Control": "no-cache", 
       },
     });
   } catch (err) {
-    console.error(err);
-    return new NextResponse("Server Error", { status: 500 });
+    console.error("TTS Server Error:", err);
+    return new NextResponse("Internal Server Error during TTS processing.", { status: 500 });
   }
 }
