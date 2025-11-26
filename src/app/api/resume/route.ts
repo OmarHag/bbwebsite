@@ -22,7 +22,7 @@ export async function POST(req: Request) {
 
     const response = await groq.chat.completions.create({
       // Use the standard text model that often has vision capabilities enabled, or the latest vision model name
-      model: "meta/llama-4-scout-17b-16k-instruct", 
+      model: "openai/gpt-oss-20b", 
       messages: [
         {
           role: "user",
