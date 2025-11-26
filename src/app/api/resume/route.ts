@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
-import Groq from "groq-sdk";
+export const runtime = "nodejs";
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+import { NextResponse } from "next/server";
+// @ts-ignore
+import PDFParser from "pdf2json";
+import * as path from 'path';
 
 export async function POST(req: Request) {
   try {
@@ -18,52 +18,55 @@ export async function POST(req: Request) {
     }
 
     const buffer = Buffer.from(await resume.arrayBuffer());
-    const base64DataURI = `data:${resume.type};base64,${buffer.toString("base64")}`;
 
-    const response = await groq.chat.completions.create({
-      // Use the standard text model that often has vision capabilities enabled, or the latest vision model name
-      model: "openai/gpt-oss-20b", 
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: "Extract all text from this resume. Return clean plain text only.",
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: base64DataURI,
-              },
-            },
-          ],
-        },
-      ],
+    const pdfParser = new PDFParser();
+
+    const extractedText: string = await new Promise((resolve, reject) => {
+      let text = "";
+
+      pdfParser.on("pdfParser_dataError", (err: any) => {
+        reject(err.parserError);
+      });
+
+      pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
+        pdfData.Pages.forEach((page: any) => {
+          page.Texts.forEach((t: any) => {
+            const encodedText = t.R[0].T; // Get the encoded text segment
+
+            // ✅ FIX: Use try/catch to safely decode text and prevent URIError crashes.
+            try {
+                // Attempt standard decoding
+                text += decodeURIComponent(encodedText) + " ";
+            } catch (e) {
+                // If decoding fails (URI malformed), append the raw, encoded text instead.
+                // This ensures the application doesn't crash.
+                console.warn(`Failed to decode PDF text segment: ${encodedText}`);
+                text += encodedText + " "; 
+            }
+          });
+        });
+        resolve(text);
+      });
+
+      pdfParser.parseBuffer(buffer);
     });
 
-    const extracted = response.choices[0]?.message?.content?.trim() || "";
+    const cleanText = extractedText.replace(/\s+/g, " ").trim();
 
-    if (!extracted) {
-        return NextResponse.json(
-            { error: "Groq API returned empty text." },
-            { status: 500 }
-        );
+    if (cleanText.length < 20) {
+      return NextResponse.json(
+        { error: "Resume text is too short or cannot be extracted." },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
       ok: true,
-      text: extracted,
+      text: cleanText,
     });
 
   } catch (err) {
     console.error("Resume API Error:", err);
-    if (err instanceof Error && 'status' in err) {
-         return NextResponse.json(
-            { error: `Groq Request failed: ${err.message}` },
-            { status: err.status as number }
-         );
-    }
     return NextResponse.json(
       { error: "Failed to process resume." },
       { status: 500 }
