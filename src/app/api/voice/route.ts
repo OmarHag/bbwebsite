@@ -1,112 +1,234 @@
+// src/app/api/voice/route.ts
 import { NextResponse } from "next/server";
 import Groq from "groq-sdk";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY! });
+
+type CoachReview = {
+  score: number;
+  categories: { label: string; value: number }[];
+  summary: string;
+  strengths: string[];
+  improvements: string[];
+  nextSteps: string[];
+};
 
 export async function POST(req: Request) {
   try {
     const formData = await req.formData();
 
     const audioFile = formData.get("audio") as File | null;
-    const company = (formData.get("company") as string) || "General company";
-    const role = (formData.get("role") as string) || "Software Engineering Intern";
+    const company = (formData.get("company") as string) || "General Company";
+    const role = (formData.get("role") as string) || "Software Engineer";
     const resumeText = (formData.get("resumeText") as string) || "";
+    const endInterview = formData.get("endInterview") === "true";
 
-    if (!audioFile) {
-      return NextResponse.json({ error: "No audio uploaded" }, { status: 400 });
+    // Cooldown to prevent Groq 429 rate limit
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    const isEmptyAudio = !audioFile || audioFile.size === 0;
+    let transcriptText = "";
+
+    // ---- Whisper Transcript ----
+    if (!isEmptyAudio) {
+      const wrapped = new File([audioFile], "audio.webm", { type: "audio/webm" });
+
+      const transcription = await groq.audio.transcriptions.create({
+        file: wrapped,
+        model: "whisper-large-v3",
+      });
+
+      transcriptText = (transcription.text || "").trim();
+    } else {
+      transcriptText = endInterview
+        ? "[User ended the interview and requested feedback.]"
+        : "";
     }
 
-    // Wrap into proper file for Whisper
-    const wrapped = new File([audioFile], "audio.webm", {
-      type: "audio/webm",
-    });
-
-    // ----------------------------
-    // 1) TRANSCRIBE AUDIO
-    // ----------------------------
-    const transcription = await groq.audio.transcriptions.create({
-      file: wrapped,
-      model: "whisper-large-v3",
-    });
-
-    const transcriptText = (transcription.text || "").trim();
-
-    // ----------------------------
-    // 2) EXTRACT PROJECTS FROM RESUME
-    // (simple regex-based detection)
-    // ----------------------------
+    // ---- Extract project lines ----
     function extractProjects(text: string): string[] {
       if (!text) return [];
-      const lines = text.split("\n");
-      return lines
-        .filter((l) => l.toLowerCase().includes("project"))
-        .slice(0, 5); // limit to 5 to keep prompt small
+      return text
+        .split("\n")
+        .filter(
+          (line) =>
+            line.toLowerCase().includes("project") ||
+            line.toLowerCase().includes("built") ||
+            line.toLowerCase().includes("developed")
+        )
+        .slice(0, 8);
     }
 
     const detectedProjects = extractProjects(resumeText);
     const projectList =
       detectedProjects.length > 0
-        ? detectedProjects.join("\n- ")
-        : "[No clear projects detected]";
+        ? detectedProjects.map((p) => `- ${p}`).join("\n")
+        : "- [No clear projects detected from resume text]";
 
-    // ----------------------------
-    // 3) SYSTEM PROMPT
-    // ----------------------------
-    const systemPrompt = `
-You are a strict AI mock interviewer for the company "${company}", for the role "${role}".
+    // =====================================
+    // MODE 1 — INTERVIEWER (NOT ENDING)
+    // =====================================
 
-The candidate uploaded this resume text:
-${resumeText || "[No resume provided]"}
-
-These are project lines detected in their resume:
-- ${projectList}
+    if (!endInterview) {
+      const systemPromptInterview = `
+You are a realistic human interviewer.
+Warm, conversational, human — NOT robotic.
 
 INTERVIEW RULES:
-- ALWAYS remain in interview mode.
-- If the user asks:
-  "Do you see my resume?"
-  "Mention a project from my resume"
-  "Talk about my resume"
-  → You MUST reference one of the detected projects above.
-- If resume is empty, say: 
-  "I received your resume but the project section was unclear."
-- Every reply MUST:
-  1. Give short feedback (2 sentences max)
-  2. Ask EXACTLY ONE interview question
-- Prefer questions related to:
-  • Their resume  
-  • Their projects  
-  • The chosen company (${company})  
-  • The chosen role (${role})
-- DO NOT hallucinate fake projects. Use only detected ones above.
-- Keep your tone human, concise, and realistic.
+- Respond naturally to what the candidate said.
+- Give 1–2 sentences of reaction.
+- Ask EXACTLY ONE follow-up question.
+- DO NOT provide feedback.
+- DO NOT score.
+- DO NOT break character.
+
+RESUME:
+${resumeText || "[None]"}
+
+PROJECT HINTS:
+${projectList}
 `;
 
-    // ----------------------------
-    // 4) USER PROMPT
-    // ----------------------------
-    const userPrompt = transcriptText
-      ? `User said: "${transcriptText}". Continue interview.`
-      : `Start interview for ${role} at ${company}.`;
+      const userPrompt = transcriptText
+        ? `Candidate said: "${transcriptText}" — respond in INTERVIEW MODE.`
+        : `Start the interview for ${role} at ${company}. Greet them naturally and begin.`;
 
-    // ----------------------------
-    // 5) GET AI RESPONSE
-    // ----------------------------
-    const chatResponse = await groq.chat.completions.create({
-      model: "llama-3.1-8b-instant",
+      const chatResponse = await groq.chat.completions.create({
+        model: "llama-3.1-8b-instant",
+        messages: [
+          { role: "system", content: systemPromptInterview },
+          { role: "user", content: userPrompt },
+        ],
+        max_tokens: 500,
+        temperature: 0.3,
+      });
+
+      const reply =
+        chatResponse.choices[0]?.message?.content?.trim() ||
+        "Let's get started — walk me through your background.";
+
+      return NextResponse.json({
+        transcript: transcriptText,
+        reply,
+        ended: false,
+      });
+    }
+
+    // ======================================================
+    // MODE 2 — STRICT COACH MODE (JSON ONLY)
+    // ======================================================
+
+    const systemPromptCoach = `
+You are a FAANG-level senior interviewer giving HARSH, STRICT review.
+
+You MUST penalize short interviews heavily.
+
+==================================================
+WORD-COUNT STRICTNESS RULES
+==================================================
+Let WORD_COUNT be the transcript length.
+
+If WORD_COUNT < 120 OR fewer than 3 total answers:
+- Final score MUST be 1–3/10
+- Category scores MUST be 1–4/10
+- Summary MUST include:
+  "The interview was extremely short, which severely impacted your evaluation."
+
+If WORD_COUNT 120–300:
+- Final score MAX = 6/10
+
+If WORD_COUNT > 300:
+- Score normally (still strict).
+
+==================================================
+SCORING RULES
+==================================================
+1–3 → Very poor  
+4–5 → Weak  
+6 → Barely OK  
+7 → Decent  
+8–9 → Strong  
+10 → Extremely rare  
+
+Cutting the interview short = automatic deduction.
+
+==================================================
+OUTPUT FORMAT — JSON ONLY
+==================================================
+{
+  "score": number,
+  "categories": [
+    { "label": "Communication Clarity", "value": number },
+    { "label": "Confidence & Delivery", "value": number },
+    { "label": "Technical Strength", "value": number },
+    { "label": "Project & Resume Depth", "value": number },
+    { "label": "Problem Solving & Thinking", "value": number },
+    { "label": "Role Fit for ${role}", "value": number }
+  ],
+  "summary": "strict paragraph",
+  "strengths": ["...", "..."],
+  "improvements": ["...", "..."],
+  "nextSteps": ["...", "..."]
+}
+
+No markdown. No backticks.
+Be harsh, realistic, and direct.
+`;
+
+    const userPromptCoach = `
+TRANSCRIPT:
+${transcriptText}
+
+RESUME:
+${resumeText}
+
+PROJECTS:
+${projectList}
+
+Generate STRICT JSON ONLY.
+`;
+
+    const coachResponse = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
       messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
+        { role: "system", content: systemPromptCoach },
+        { role: "user", content: userPromptCoach },
       ],
+      max_tokens: 500,
+      temperature: 0.3,
     });
 
-    const reply =
-      chatResponse.choices[0]?.message?.content?.trim() ||
-      `Let's begin. Why are you interested in this role at ${company}?`;
+    const raw = coachResponse.choices[0]?.message?.content?.trim() || "";
+
+    let review: CoachReview;
+
+    try {
+      review = JSON.parse(raw) as CoachReview;
+    } catch (err) {
+      console.error("JSON parse error:", raw);
+
+      review = {
+        score: 2,
+        categories: [
+          { label: "Communication Clarity", value: 2 },
+          { label: "Confidence & Delivery", value: 2 },
+          { label: "Technical Strength", value: 2 },
+          { label: "Project & Resume Depth", value: 2 },
+          { label: "Problem Solving & Thinking", value: 2 },
+          { label: `Role Fit for ${role}`, value: 2 },
+        ],
+        summary:
+          "The interview response was too short or malformed for proper evaluation.",
+        strengths: [],
+        improvements: ["Provide real answers next time."],
+        nextSteps: ["Complete at least 3–5 questions before ending."],
+      };
+    }
 
     return NextResponse.json({
       transcript: transcriptText,
-      reply,
+      review,
+      ended: true,
     });
   } catch (err) {
     console.error("Voice API error:", err);
