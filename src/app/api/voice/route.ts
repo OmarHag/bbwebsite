@@ -2,7 +2,17 @@
 import { NextResponse } from "next/server";
 import Groq from "groq-sdk";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY! });
+let groq: Groq | null = null;
+
+function getGroq() {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error("GROQ_API_KEY is required for voice interviews.");
+  }
+
+  groq ??= new Groq({ apiKey });
+  return groq;
+}
 
 type CoachReview = {
   score: number;
@@ -15,6 +25,7 @@ type CoachReview = {
 
 export async function POST(req: Request) {
   try {
+    const groq = getGroq();
     const formData = await req.formData();
 
     const audioFile = formData.get("audio") as File | null;
