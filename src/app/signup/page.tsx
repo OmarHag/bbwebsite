@@ -2,7 +2,7 @@ export default function SignupPage() {
   return (
     <main className="min-h-screen bg-slate-900 text-white px-6 py-12 flex justify-center">
       <div className="w-full max-w-md bg-slate-800/70 border border-slate-700 rounded-2xl p-8 shadow-lg">
-        <h1 className="text-2xl font-bold mb-2">Create your Avanti account</h1>
+        <h1 className="text-2xl font-bold mb-2">Create your InterviewCoach AI account</h1>
         <p className="text-sm text-slate-300 mb-6">
           Start a free trial and practice mock interviews with Voice AI.
         </p>

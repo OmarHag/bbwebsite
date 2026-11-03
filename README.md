@@ -1,4 +1,4 @@
-# Avanti InterviewCoach
+# InterviewCoach AI
 
 An interview-practice prototype that combines role-specific behavioral questions, resume ingestion, voice routes, and structured answer feedback in a responsive Next.js application.
 
@@ -6,7 +6,7 @@ An interview-practice prototype that combines role-specific behavioral questions
 
 ## Problem and implemented scope
 
-Interview practice is most useful when it is specific and repeatable. Avanti lets a learner choose a role and difficulty, practice a question, and receive feedback emphasizing ownership, STAR structure, detail, and measurable outcomes. Separate routes handle PDF resume parsing, text-to-speech, voice input, and session summaries.
+Interview practice is most useful when it is specific and repeatable. InterviewCoach AI lets a learner choose a role and difficulty, practice a question, and receive feedback emphasizing ownership, STAR structure, detail, and measurable outcomes. Separate routes handle PDF resume parsing, text-to-speech, voice input, and session summaries.
 
 The answer scorer in `src/app/api/interview/route.ts` is deliberately a transparent heuristic—not a claim of validated AI assessment. It uses answer length and explicit signals such as STAR terms, ownership language, causal explanation, and numbers. Other routes integrate Groq, OpenAI, and ElevenLabs when their environment variables are configured.
 

@@ -6,7 +6,7 @@ export default function Navbar() {
       <div className="flex items-center gap-3">
         <img src="/logo.png" className="h-8" />
         <span className="text-xl font-bold text-blue-300">
-          Avanti InterviewCoach AI
+          InterviewCoach AI
         </span>
       </div>
 

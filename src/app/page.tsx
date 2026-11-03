@@ -179,7 +179,7 @@ export default function HomePage() {
           {/* FOOTER */}
           <footer className="py-10 px-6 border-t border-white/10">
             <div className="max-w-7xl mx-auto text-center text-slate-400 text-sm">
-              © {new Date().getFullYear()} Avanti AI Career Coach. All rights
+              © {new Date().getFullYear()} InterviewCoach AI. All rights
               reserved.
             </div>
           </footer>

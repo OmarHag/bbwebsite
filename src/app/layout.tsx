@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 export const metadata = {
-  title: "Avanti InterviewCoach AI",
+  title: "InterviewCoach AI",
   description: "AI-powered interview coach with realistic voice practice",
 };
 
@@ -23,13 +23,13 @@ export default function RootLayout({
               <div className="relative h-10 w-28 md:h-12 md:w-32">
                 <Image
                   src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/691ce79519a4c03a38244c47/bc8be9f3d_Screenshot2025-11-18141322.png"
-                  alt="Avanti Logo"
+                  alt="InterviewCoach AI logo"
                   fill
                   className="object-contain"
                 />
               </div>
               <span className="hidden text-xl font-bold text-white md:inline">
-                Avanti InterviewCoach AI
+                InterviewCoach AI
               </span>
             </Link>
 

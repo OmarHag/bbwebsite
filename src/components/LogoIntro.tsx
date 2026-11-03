@@ -44,7 +44,7 @@ export default function LogoIntro({ onComplete }: { onComplete?: () => void }) {
             >
               <motion.img
                 src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/691ce79519a4c03a38244c47/bc8be9f3d_Screenshot2025-11-18141322.png"
-                alt="Avanti Logo"
+                alt="InterviewCoach AI logo"
                 className="h-40"
                 initial={{ opacity: 0, x: -30 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -58,7 +58,7 @@ export default function LogoIntro({ onComplete }: { onComplete?: () => void }) {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.7, duration: 0.8 }}
                 >
-                  Avanti
+                  InterviewCoach AI
                 </motion.h1>
 
                 <motion.div

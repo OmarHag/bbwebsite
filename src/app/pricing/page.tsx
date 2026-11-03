@@ -131,7 +131,7 @@ export default function PricingPage() {
               University & B2B Licensing
             </h3>
             <p className="text-slate-200 mb-6 text-base md:text-lg">
-              Interested in bringing Avanti to your campus or organization?
+              Interested in bringing InterviewCoach AI to your campus or organization?
             </p>
             <button className="inline-flex h-11 items-center rounded-full bg-teal-600 px-8 text-sm font-semibold text-white hover:bg-teal-700 transition">
               Contact Sales
@@ -180,7 +180,7 @@ export default function PricingPage() {
       {/* FOOTER */}
       <footer className="py-10 px-6 border-t border-slate-200 bg-white">
         <div className="max-w-7xl mx-auto text-center text-slate-600 text-sm">
-          © {new Date().getFullYear()} Avanti AI Career Coach. All rights
+          © {new Date().getFullYear()} InterviewCoach AI. All rights
           reserved.
         </div>
       </footer>
