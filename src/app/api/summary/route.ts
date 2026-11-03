@@ -3,8 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { Groq } from "groq-sdk";
 import { marked } from "marked";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
 export async function POST(req: NextRequest) {
   if (!process.env.GROQ_API_KEY) {
     return NextResponse.json(
@@ -14,6 +12,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     const { messages, company, role, resumeText, endInterview } = await req.json();
 
     const chatHistory = (messages || [])
